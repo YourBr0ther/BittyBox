@@ -1,18 +1,63 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser } from 'react-icons/fa';
+import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser, FaDownload } from 'react-icons/fa';
 import PlaylistUploader from '@/components/Playlists/PlaylistUploader';
 import { YouTubeService, type Playlist } from '@/services/youtubeService';
+
+// Define the BeforeInstallPromptEvent interface
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>;
+}
+
+declare global {
+  interface WindowEventMap {
+    'beforeinstallprompt': BeforeInstallPromptEvent;
+  }
+}
 
 export default function SettingsPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [tab, setTab] = useState<'general' | 'playlists' | 'account'>('general');
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const router = useRouter();
   const { data: session, status } = useSession();
   const isLoading = status === 'loading';
+  
+  useEffect(() => {
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    // Listen for the beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      deferredPrompt.current = e;
+      // Update UI to show the install button
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Listen for app installation
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      deferredPrompt.current = null;
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+    };
+  }, []);
   
   useEffect(() => {
     const loadPlaylists = async () => {
@@ -42,6 +87,28 @@ export default function SettingsPage() {
   
   const handleSignOut = () => {
     signOut({ callbackUrl: '/settings?tab=account' });
+  };
+  
+  const handleInstallApp = async () => {
+    if (!deferredPrompt.current) {
+      return;
+    }
+    
+    // Show the install prompt
+    deferredPrompt.current.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const choiceResult = await deferredPrompt.current.userChoice;
+    
+    // We no longer need the prompt regardless of the outcome
+    deferredPrompt.current = null;
+    setIsInstallable(false);
+    
+    if (choiceResult.outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
   };
   
   return (
@@ -116,7 +183,7 @@ export default function SettingsPage() {
             </div>
           </div>
           
-          <div>
+          <div className="mb-6">
             <label className="block text-pink-dark mb-2 font-semibold">Volume Level</label>
             <input 
               type="range" 
@@ -125,6 +192,28 @@ export default function SettingsPage() {
               defaultValue="80"
               className="w-full accent-pink-primary" 
             />
+          </div>
+          
+          <div>
+            <label className="block text-pink-dark mb-2 font-semibold">Install as App</label>
+            {isInstalled ? (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-green-700">BittyBox is installed as an app! 🎉</p>
+              </div>
+            ) : isInstallable ? (
+              <button 
+                onClick={handleInstallApp}
+                className="flex items-center bg-pink-primary text-white py-2 px-4 rounded-md hover:bg-pink-accent transition-all"
+              >
+                <FaDownload className="mr-2" /> Install BittyBox
+              </button>
+            ) : (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                <p className="text-gray-700">
+                  Visit BittyBox in Chrome or Safari to install it as an app on your device.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
