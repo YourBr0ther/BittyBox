@@ -1,3 +1,11 @@
+import { getSession } from 'next-auth/react';
+import { Session } from 'next-auth';
+
+// Extend the built-in session types
+interface ExtendedSession extends Session {
+  accessToken?: string;
+}
+
 interface Song {
   id: string;
   title: string;
@@ -14,83 +22,181 @@ interface Playlist {
   songs?: Song[];
 }
 
-// Mock data until we implement the actual YouTube API integration
-const MOCK_SONGS: Song[] = [
-  {
-    id: '1',
-    title: 'Twinkle Twinkle Little Star',
-    artist: 'Kids Songs',
-    thumbnail: 'https://via.placeholder.com/300/FF6B9D/FFFFFF?text=✨',
-    videoId: 'yCjJyiqpAuU',
-  },
-  {
-    id: '2',
-    title: 'The Wheels on the Bus',
-    artist: 'Kids Songs',
-    thumbnail: 'https://via.placeholder.com/300/FFB5D4/FFFFFF?text=🚌',
-    videoId: 'HP-MbfQ9K9o',
-  },
-  {
-    id: '3',
-    title: 'Old MacDonald Had a Farm',
-    artist: 'Kids Songs',
-    thumbnail: 'https://via.placeholder.com/300/FF3A7A/FFFFFF?text=🐄',
-    videoId: 'LIWbUjHZFTw',
-  },
-];
+// Store for local caching
+const playlistCache = new Map<string, Playlist>();
+const songCache = new Map<string, Song[]>();
 
-// Mock data for playlists
-const MOCK_PLAYLISTS: Playlist[] = [
-  {
-    id: '1',
-    name: 'Favorite Songs',
-    icon: 'star',
-    url: 'https://www.youtube.com/playlist?list=sample1',
-    songs: MOCK_SONGS,
-  },
-  {
-    id: '2',
-    name: 'Animal Songs',
-    icon: 'cat',
-    url: 'https://www.youtube.com/playlist?list=sample2',
-    songs: MOCK_SONGS,
-  },
-  {
-    id: '3',
-    name: 'Bedtime Songs',
-    icon: 'heart',
-    url: 'https://www.youtube.com/playlist?list=sample3',
-    songs: MOCK_SONGS,
-  },
-];
+// YouTube API configuration
+const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+const DEFAULT_ICONS = ['star', 'heart', 'magic', 'cat', 'dog', 'icecream'];
+
+// Helper to extract playlist ID from YouTube URL
+const extractPlaylistId = (url: string): string | null => {
+  const regex = /(?:list=)([a-zA-Z0-9_-]+)/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
 
 /**
  * YouTube Service for handling playlist and song interactions
- * This is a mock service until the YouTube API integration is complete
+ * Uses the YouTube Data API with authentication
  */
 export const YouTubeService = {
   /**
-   * Get all available playlists
+   * Get authenticated API headers
+   */
+  getAuthHeaders: async (): Promise<HeadersInit> => {
+    const session = await getSession() as ExtendedSession | null;
+    
+    if (!session?.accessToken) {
+      throw new Error('No authentication token available');
+    }
+    
+    return {
+      'Authorization': `Bearer ${session.accessToken}`,
+      'Content-Type': 'application/json',
+    };
+  },
+  
+  /**
+   * Get default API headers with API key
+   */
+  getDefaultHeaders: (): HeadersInit => {
+    return {
+      'Content-Type': 'application/json',
+    };
+  },
+  
+  /**
+   * Make authenticated API request to YouTube
+   */
+  fetchFromYouTube: async (endpoint: string, authenticated: boolean = true): Promise<any> => {
+    let apiKey = '';
+    
+    if (!authenticated) {
+      apiKey = `&key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || ''}`;
+    }
+    
+    const headers = authenticated 
+      ? await YouTubeService.getAuthHeaders() 
+      : YouTubeService.getDefaultHeaders();
+    
+    const response = await fetch(`${YOUTUBE_API_BASE}${endpoint}${apiKey}`, {
+      headers,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`YouTube API error: ${errorData.error?.message || response.statusText}`);
+    }
+    
+    return response.json();
+  },
+  
+  /**
+   * Get user's playlists from YouTube
    */
   getPlaylists: async (): Promise<Playlist[]> => {
-    // In the future, we'll fetch from local storage or YouTube API
-    return MOCK_PLAYLISTS;
+    try {
+      // Try to fetch authenticated playlists
+      const data = await YouTubeService.fetchFromYouTube(
+        '/playlists?part=snippet&mine=true&maxResults=50'
+      );
+      
+      const playlists: Playlist[] = data.items.map((item: any, index: number) => {
+        const playlist: Playlist = {
+          id: item.id,
+          name: item.snippet.title,
+          icon: DEFAULT_ICONS[index % DEFAULT_ICONS.length],
+          url: `https://www.youtube.com/playlist?list=${item.id}`,
+        };
+        
+        // Cache the playlist
+        playlistCache.set(item.id, playlist);
+        
+        return playlist;
+      });
+      
+      return playlists;
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+      
+      // If authenticated request fails or no session, use local storage or fallback
+      const storedPlaylists = localStorage.getItem('bittybox_playlists');
+      return storedPlaylists ? JSON.parse(storedPlaylists) : [];
+    }
   },
   
   /**
    * Get a specific playlist by ID
    */
   getPlaylistById: async (id: string): Promise<Playlist | null> => {
-    const playlist = MOCK_PLAYLISTS.find(p => p.id === id);
-    return playlist || null;
+    // Check cache first
+    if (playlistCache.has(id)) {
+      return playlistCache.get(id) || null;
+    }
+    
+    try {
+      const data = await YouTubeService.fetchFromYouTube(
+        `/playlists?part=snippet&id=${id}`
+      );
+      
+      if (data.items && data.items.length > 0) {
+        const item = data.items[0];
+        const playlist: Playlist = {
+          id: item.id,
+          name: item.snippet.title,
+          icon: DEFAULT_ICONS[0],
+          url: `https://www.youtube.com/playlist?list=${item.id}`,
+        };
+        
+        // Cache the playlist
+        playlistCache.set(id, playlist);
+        
+        return playlist;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error fetching playlist ${id}:`, error);
+      return null;
+    }
   },
   
   /**
    * Get songs for a specific playlist
    */
   getSongsForPlaylist: async (playlistId: string): Promise<Song[]> => {
-    const playlist = MOCK_PLAYLISTS.find(p => p.id === playlistId);
-    return playlist?.songs || [];
+    // Check cache first
+    if (songCache.has(playlistId)) {
+      return songCache.get(playlistId) || [];
+    }
+    
+    try {
+      const data = await YouTubeService.fetchFromYouTube(
+        `/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}`
+      );
+      
+      const songs: Song[] = data.items.map((item: any, index: number) => {
+        const song: Song = {
+          id: item.id,
+          title: item.snippet.title,
+          artist: item.snippet.videoOwnerChannelTitle || 'Unknown Artist',
+          thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
+          videoId: item.snippet.resourceId.videoId,
+        };
+        
+        return song;
+      });
+      
+      // Cache the songs
+      songCache.set(playlistId, songs);
+      
+      return songs;
+    } catch (error) {
+      console.error(`Error fetching songs for playlist ${playlistId}:`, error);
+      return [];
+    }
   },
 
   /**
@@ -100,32 +206,64 @@ export const YouTubeService = {
   importPlaylistsFromCSV: async (csvContent: string): Promise<Playlist[]> => {
     const lines = csvContent.split('\n');
     const playlists: Playlist[] = [];
+    const existingPlaylists = await YouTubeService.getPlaylists();
+    const existingIds = new Set(existingPlaylists.map(p => p.id));
     
-    lines.forEach((line, index) => {
-      if (!line.trim()) return;
+    for (const line of lines) {
+      if (!line.trim()) continue;
       
       const [name, url, icon] = line.split(',').map(item => item.trim());
       
       if (name && url) {
-        playlists.push({
-          id: `imported-${index}`,
-          name,
-          url,
-          icon: icon || 'star',
-        });
+        const playlistId = extractPlaylistId(url);
+        
+        if (!playlistId) {
+          console.warn(`Invalid YouTube playlist URL: ${url}`);
+          continue;
+        }
+        
+        // Skip if already in the list
+        if (existingIds.has(playlistId)) {
+          continue;
+        }
+        
+        try {
+          // Verify the playlist exists and get its details
+          const playlistData = await YouTubeService.fetchFromYouTube(
+            `/playlists?part=snippet&id=${playlistId}`,
+            false // Use API key instead of auth
+          );
+          
+          if (playlistData.items && playlistData.items.length > 0) {
+            const playlist: Playlist = {
+              id: playlistId,
+              name: name || playlistData.items[0].snippet.title,
+              icon: icon || DEFAULT_ICONS[Math.floor(Math.random() * DEFAULT_ICONS.length)],
+              url: url,
+            };
+            
+            playlists.push(playlist);
+            playlistCache.set(playlistId, playlist);
+          }
+        } catch (error) {
+          console.error(`Error importing playlist ${playlistId}:`, error);
+        }
       }
-    });
+    }
     
-    // In the future, we'll save to local storage
+    // Save to local storage for offline use
+    const allPlaylists = [...existingPlaylists, ...playlists];
+    localStorage.setItem('bittybox_playlists', JSON.stringify(allPlaylists));
+    
     return playlists;
   },
   
   /**
-   * Play a YouTube video (placeholder for now)
+   * Load a YouTube video for playback
    */
   playSong: async (videoId: string): Promise<void> => {
     console.log(`Playing video ID: ${videoId}`);
-    // In the future, this will control the YouTube player
+    // This will be implemented in the YouTube player component
   },
 };
 
