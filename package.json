@@ -9,11 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "generate-icons": "node scripts/generate-icons.js",
-    "clean": "rimraf .next out",
-    "build:static": "node scripts/build-static.js",
-    "export": "next export",
-    "serve:static": "npx serve -p 8080 out",
-    "serve-local": "node scripts/serve-local.js"
+    "clean": "rimraf .next out"
   },
   "keywords": [],
   "author": "",

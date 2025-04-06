@@ -23,58 +23,8 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<'general' | 'playlists' | 'account'>('general');
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isStatic, setIsStatic] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const router = useRouter();
-  
-  useEffect(() => {
-    // Check if we're in a static environment using multiple methods
-    const checkStatic = async () => {
-      try {
-        setIsAuthChecking(true);
-        
-        // Method 1: Try to fetch the static-mode.json indicator file
-        try {
-          const staticModeResponse = await fetch('/static-mode.json', {
-            signal: AbortSignal.timeout(1000)
-          });
-          
-          if (staticModeResponse.ok) {
-            console.log('Static mode detected via static-mode.json');
-            setIsStatic(true);
-            setIsAuthChecking(false);
-            return;
-          }
-        } catch (e) {
-          // File doesn't exist, continue to other detection methods
-        }
-        
-        // Method 2: Try the auth session endpoint
-        try {
-          const authResponse = await fetch('/api/auth/session', {
-            signal: AbortSignal.timeout(2000)
-          });
-          
-          if (authResponse.status === 404) {
-            console.log('Static mode detected via API 404');
-            setIsStatic(true);
-          } else {
-            console.log('Dynamic mode detected - auth API available');
-            setIsStatic(false);
-          }
-        } catch (error) {
-          // If the fetch fails, we're likely in a static environment
-          console.log('Auth API not available, assuming static mode');
-          setIsStatic(true);
-        }
-      } finally {
-        setIsAuthChecking(false);
-      }
-    };
-    
-    checkStatic();
-  }, []);
 
   useEffect(() => {
     // Check if app is already installed
@@ -129,24 +79,12 @@ export default function SettingsPage() {
   };
   
   const handleSignIn = () => {
-    if (isStatic) {
-      // In static site, just show an alert
-      alert('Authentication is not available in static site mode. Please use the live version of the site to sign in.');
-      return;
-    }
-    
-    // Regular sign in for dev or non-static builds
+    // Regular sign in
     window.location.href = '/api/auth/signin/google?callbackUrl=/settings?tab=account';
   };
   
   const handleSignOut = () => {
-    if (isStatic) {
-      // In static site, just show an alert
-      alert('Authentication is not available in static site mode. Please use the live version of the site to sign out.');
-      return;
-    }
-    
-    // Regular sign out for dev or non-static builds
+    // Regular sign out
     window.location.href = '/api/auth/signout?callbackUrl=/settings?tab=account';
   };
   
@@ -171,34 +109,6 @@ export default function SettingsPage() {
       console.log('User dismissed the install prompt');
     }
   };
-  
-  // Render the account section for static builds
-  const renderStaticAccount = () => (
-    <div className="mb-8">
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <FaInfoCircle className="h-5 w-5 text-yellow-400" />
-          </div>
-          <div className="ml-3">
-            <p className="text-sm text-yellow-700">
-              <strong>Static Site Mode:</strong> Authentication with Google is not available in this static deployment. Please use the live version of the site to sign in.
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex justify-center mb-8">
-        <button 
-          onClick={handleSignIn}
-          className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center opacity-60 cursor-not-allowed"
-          disabled
-        >
-          <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google (Disabled in Static Mode)
-        </button>
-      </div>
-    </div>
-  );
   
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -351,22 +261,14 @@ export default function SettingsPage() {
             Connect your Google account to enable YouTube Premium features.
           </p>
           
-          {isAuthChecking ? (
-            <div className="flex justify-center mb-8">
-              <div className="animate-pulse bg-gray-200 h-12 w-48 rounded-lg"></div>
-            </div>
-          ) : isStatic ? (
-            renderStaticAccount()
-          ) : (
-            <div className="flex justify-center mb-8">
-              <button 
-                onClick={handleSignIn}
-                className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center"
-              >
-                <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google
-              </button>
-            </div>
-          )}
+          <div className="flex justify-center mb-8">
+            <button 
+              onClick={handleSignIn}
+              className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center"
+            >
+              <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google
+            </button>
+          </div>
           
           <div className="bg-pink-light/50 p-4 rounded-lg">
             <h3 className="font-semibold text-pink-dark mb-2">Why connect?</h3>

@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Make site deployable to GitHub Pages and other static hosts
-  output: 'export',
-  distDir: 'out',
+  // Comment out static export settings
+  // output: 'export',
+  // distDir: 'out',
   
-  // Needed for static export with images
+  // Keep images optimization for normal development 
   images: {
-    unoptimized: true,
+    domains: ['i.ytimg.com', 'img.youtube.com'],
   },
   
   // Don't add trailing slashes
