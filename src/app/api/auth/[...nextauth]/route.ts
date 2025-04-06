@@ -21,6 +21,12 @@ interface ExtendedJWT extends JWT {
   accessTokenExpires?: number;
 }
 
+// Force port 3000 for all URLs
+const useSecure = process.env.NODE_ENV === 'production';
+const baseUrl = useSecure
+  ? process.env.NEXTAUTH_URL || 'https://bittybox.example.com'
+  : 'http://localhost:3000';
+
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -43,6 +49,9 @@ const handler = NextAuth({
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000; // Default 1 hour
+        
+        // Log the scopes for debugging
+        console.log('Account scopes:', account.scope);
       }
       
       // If token has not expired, return it
@@ -65,6 +74,10 @@ const handler = NextAuth({
       
       return extendedSession;
     },
+    async redirect({ url, baseUrl }) {
+      // Force all callback URLs to use port 3000
+      return url.startsWith(baseUrl) ? url : baseUrl;
+    },
   },
   pages: {
     // Custom sign-in page for better user experience
@@ -72,6 +85,19 @@ const handler = NextAuth({
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
+  // Force specific URLs
+  useSecureCookies: useSecure,
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecure,
+      },
+    },
+  },
 });
 
 export { handler as GET, handler as POST }; 

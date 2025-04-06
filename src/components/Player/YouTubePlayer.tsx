@@ -87,50 +87,59 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(({
 
   // Initialize the player
   useEffect(() => {
+    // Skip initialization if no videoId provided
+    if (!videoId) return;
+    
+    let isMounted = true;
+    
     const initPlayer = async () => {
       try {
         await loadYouTubeAPI();
 
-        if (playerElementRef.current && window.YT) {
-          // Destroy any existing player
-          if (playerRef.current) {
-            playerRef.current.destroy();
-          }
-
-          playerRef.current = new window.YT.Player(playerElementRef.current, {
-            height: '100%',
-            width: '100%',
-            videoId: videoId,
-            playerVars: {
-              // Auto-play if specified
-              autoplay: autoplay ? 1 : 0,
-              // Controls on mobile need to be enabled
-              controls: 1,
-              // Disable keyboard controls for safety
-              disablekb: 1,
-              // Enable modest branding (smaller YouTube logo)
-              modestbranding: 1,
-              // Disable related videos at the end
-              rel: 0,
-              // For Premium accounts, disable ads 
-              iv_load_policy: 3,
-              // Disable full-screen
-              fs: 0,
-            },
-            events: {
-              onReady: () => {
-                setIsReady(true);
-                if (onReady) onReady();
-              },
-              onStateChange: (event: any) => {
-                if (onStateChange) onStateChange(event.data);
-              },
-              onError: (event: any) => {
-                if (onError) onError(event.data);
-              },
-            },
-          });
+        if (!isMounted || !playerElementRef.current || !window.YT) return;
+        
+        // Destroy any existing player
+        if (playerRef.current) {
+          playerRef.current.destroy();
+          playerRef.current = null;
         }
+
+        playerRef.current = new window.YT.Player(playerElementRef.current, {
+          height: '100%',
+          width: '100%',
+          videoId: videoId,
+          playerVars: {
+            // Auto-play if specified
+            autoplay: autoplay ? 1 : 0,
+            // Controls on mobile need to be enabled
+            controls: 1,
+            // Disable keyboard controls for safety
+            disablekb: 1,
+            // Enable modest branding (smaller YouTube logo)
+            modestbranding: 1,
+            // Disable related videos at the end
+            rel: 0,
+            // For Premium accounts, disable ads 
+            iv_load_policy: 3,
+            // Disable full-screen
+            fs: 0,
+          },
+          events: {
+            onReady: () => {
+              if (!isMounted) return;
+              setIsReady(true);
+              if (onReady) onReady();
+            },
+            onStateChange: (event: any) => {
+              if (!isMounted) return;
+              if (onStateChange) onStateChange(event.data);
+            },
+            onError: (event: any) => {
+              if (!isMounted) return;
+              if (onError) onError(event.data);
+            },
+          },
+        });
       } catch (error) {
         console.error('Error initializing YouTube player:', error);
       }
@@ -140,11 +149,17 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(({
 
     // Cleanup
     return () => {
+      isMounted = false;
       if (playerRef.current) {
-        playerRef.current.destroy();
+        try {
+          playerRef.current.destroy();
+        } catch (e) {
+          console.error('Error destroying player:', e);
+        }
+        playerRef.current = null;
       }
     };
-  }, [videoId, autoplay, onReady, onStateChange, onError]);
+  }, [videoId]); // Only reinitialize when videoId changes
 
   return (
     <div className="relative w-full" style={{ aspectRatio: '16/9' }}>

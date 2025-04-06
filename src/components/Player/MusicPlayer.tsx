@@ -55,6 +55,19 @@ export default function MusicPlayer({
     };
   }, []);
   
+  // Reset player state when video changes
+  useEffect(() => {
+    // Reset progress and playing state when song changes
+    setProgress(0);
+    setPlayerReady(false);
+    
+    // Clean up previous interval
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, [currentSong.videoId]);
+  
   // Handle player state changes
   const handlePlayerStateChange = (state: number) => {
     switch (state) {

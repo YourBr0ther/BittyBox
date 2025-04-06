@@ -38,17 +38,22 @@ export default function Home() {
     const loadSongs = async () => {
       if (currentPlaylist) {
         try {
+          setIsLoading(true);
           const fetchedSongs = await YouTubeService.getSongsForPlaylist(currentPlaylist.id);
           setSongs(fetchedSongs);
           setCurrentSongIndex(0);
+          setIsLoading(false);
         } catch (error) {
           console.error('Failed to load songs:', error);
+          setIsLoading(false);
         }
       }
     };
     
-    loadSongs();
-  }, [currentPlaylist]);
+    if (currentPlaylist) {
+      loadSongs();
+    }
+  }, [currentPlaylist?.id]);
   
   const handleSelectPlaylist = (playlist: Playlist) => {
     setCurrentPlaylist(playlist);
