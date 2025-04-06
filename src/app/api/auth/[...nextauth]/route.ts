@@ -21,11 +21,11 @@ interface ExtendedJWT extends JWT {
   accessTokenExpires?: number;
 }
 
-// Force port 3000 for all URLs
-const useSecure = process.env.NODE_ENV === 'production';
-const baseUrl = useSecure
-  ? process.env.NEXTAUTH_URL || 'https://bittybox.example.com'
-  : 'http://localhost:3000';
+// Allow multiple domains for production and development
+const isProd = process.env.NODE_ENV === 'production';
+const NEXTAUTH_URL = isProd 
+  ? process.env.NEXTAUTH_URL_PRODUCTION || 'https://bittybox.hiddencasa.com'
+  : process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
 const handler = NextAuth({
   providers: [
@@ -75,8 +75,17 @@ const handler = NextAuth({
       return extendedSession;
     },
     async redirect({ url, baseUrl }) {
-      // Force all callback URLs to use port 3000
-      return url.startsWith(baseUrl) ? url : baseUrl;
+      // Handle redirects for both development and production domains
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      } else if (
+        url.startsWith(baseUrl) || 
+        (isProd && url.startsWith('https://bittybox.hiddencasa.com')) ||
+        (!isProd && url.startsWith('http://localhost:3000'))
+      ) {
+        return url;
+      }
+      return baseUrl;
     },
   },
   pages: {
@@ -85,8 +94,8 @@ const handler = NextAuth({
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-  // Force specific URLs
-  useSecureCookies: useSecure,
+  // Use secure cookies in production
+  useSecureCookies: isProd,
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,
@@ -94,7 +103,7 @@ const handler = NextAuth({
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: useSecure,
+        secure: isProd,
       },
     },
   },
