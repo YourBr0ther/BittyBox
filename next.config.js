@@ -4,10 +4,6 @@ const nextConfig = {
   images: {
     domains: ['via.placeholder.com', 'i.ytimg.com', 'img.youtube.com'],
   },
-  experimental: {
-    // Enable App Router
-    appDir: true,
-  },
 };
 
 module.exports = nextConfig; 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCog, FaGoogle, FaListUl, FaArrowLeft } from 'react-icons/fa';
+import { signIn, signOut, useSession } from 'next-auth/react';
+import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser } from 'react-icons/fa';
 import PlaylistUploader from '@/components/Playlists/PlaylistUploader';
 import { YouTubeService, type Playlist } from '@/services/youtubeService';
 
@@ -10,6 +11,21 @@ export default function SettingsPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [tab, setTab] = useState<'general' | 'playlists' | 'account'>('general');
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const isLoading = status === 'loading';
+  
+  useEffect(() => {
+    const loadPlaylists = async () => {
+      try {
+        const fetchedPlaylists = await YouTubeService.getPlaylists();
+        setPlaylists(fetchedPlaylists);
+      } catch (error) {
+        console.error('Failed to load playlists:', error);
+      }
+    };
+    
+    loadPlaylists();
+  }, []);
   
   const handleBackToPlayer = () => {
     router.push('/');
@@ -18,6 +34,14 @@ export default function SettingsPage() {
   const handleImportPlaylists = (newPlaylists: Playlist[]) => {
     setPlaylists((prevPlaylists) => [...prevPlaylists, ...newPlaylists]);
     // In a real app, we would save these to storage here
+  };
+  
+  const handleSignIn = () => {
+    signIn('google', { callbackUrl: '/settings?tab=account' });
+  };
+  
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/settings?tab=account' });
   };
   
   return (
@@ -149,11 +173,54 @@ export default function SettingsPage() {
             Connect your Google account to enable YouTube Premium features.
           </p>
           
-          <div className="flex justify-center mb-8">
-            <button className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center">
-              <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google
-            </button>
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center mb-8">
+              <div className="w-10 h-10 border-4 border-pink-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : session ? (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6 p-4 bg-pink-light/50 rounded-lg">
+                <div className="flex items-center">
+                  {session.user?.image ? (
+                    <img 
+                      src={session.user.image} 
+                      alt={session.user?.name || 'User'} 
+                      className="w-12 h-12 rounded-full mr-4" 
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-pink-primary flex items-center justify-center mr-4">
+                      <FaUser className="text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-bold">{session.user?.name}</p>
+                    <p className="text-sm text-gray-600">{session.user?.email}</p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleSignOut}
+                  className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center"
+                >
+                  <FaSignOutAlt className="mr-2 text-pink-primary" /> Sign Out
+                </button>
+              </div>
+              
+              <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+                <p className="font-semibold text-green-700">Connected to YouTube</p>
+                <p className="text-sm text-green-600">Your YouTube Premium account is now connected.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center mb-8">
+              <button 
+                onClick={handleSignIn}
+                className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center"
+              >
+                <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google
+              </button>
+            </div>
+          )}
           
           <div className="bg-pink-light/50 p-4 rounded-lg">
             <h3 className="font-semibold text-pink-dark mb-2">Why connect?</h3>
