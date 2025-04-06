@@ -1,0 +1,6 @@
+
+User-agent: *
+Allow: /
+
+Sitemap: https://bittybox.hiddencasa.com/sitemap.xml
+      

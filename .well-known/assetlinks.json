@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.hiddencasa.bittybox.twa",
+    "sha256_cert_fingerprints": [
+      "placeholder_fingerprint_replace_this_when_you_have_the_actual_value"
+    ]
+  }
+}] 
