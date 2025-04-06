@@ -13,7 +13,7 @@
     "build:static": "node scripts/build-static.js",
     "export": "next export",
     "serve:static": "npx serve out",
-    "deploy": "node scripts/deploy.js"
+    "serve-local": "node scripts/serve-local.js"
   },
   "keywords": [],
   "author": "",
