@@ -24,19 +24,52 @@ export default function SettingsPage() {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isStatic, setIsStatic] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const router = useRouter();
   
   useEffect(() => {
-    // Check if we're in a static environment (no API endpoints)
+    // Check if we're in a static environment using multiple methods
     const checkStatic = async () => {
       try {
-        const response = await fetch('/api/auth/session');
-        // If we get a 404, we're in a static environment
-        setIsStatic(response.status === 404);
-      } catch (error) {
-        // If the fetch fails, we're in a static environment
-        setIsStatic(true);
+        setIsAuthChecking(true);
+        
+        // Method 1: Try to fetch the static-mode.json indicator file
+        try {
+          const staticModeResponse = await fetch('/static-mode.json', {
+            signal: AbortSignal.timeout(1000)
+          });
+          
+          if (staticModeResponse.ok) {
+            console.log('Static mode detected via static-mode.json');
+            setIsStatic(true);
+            setIsAuthChecking(false);
+            return;
+          }
+        } catch (e) {
+          // File doesn't exist, continue to other detection methods
+        }
+        
+        // Method 2: Try the auth session endpoint
+        try {
+          const authResponse = await fetch('/api/auth/session', {
+            signal: AbortSignal.timeout(2000)
+          });
+          
+          if (authResponse.status === 404) {
+            console.log('Static mode detected via API 404');
+            setIsStatic(true);
+          } else {
+            console.log('Dynamic mode detected - auth API available');
+            setIsStatic(false);
+          }
+        } catch (error) {
+          // If the fetch fails, we're likely in a static environment
+          console.log('Auth API not available, assuming static mode');
+          setIsStatic(true);
+        }
+      } finally {
+        setIsAuthChecking(false);
       }
     };
     
@@ -318,7 +351,11 @@ export default function SettingsPage() {
             Connect your Google account to enable YouTube Premium features.
           </p>
           
-          {isStatic ? (
+          {isAuthChecking ? (
+            <div className="flex justify-center mb-8">
+              <div className="animate-pulse bg-gray-200 h-12 w-48 rounded-lg"></div>
+            </div>
+          ) : isStatic ? (
             renderStaticAccount()
           ) : (
             <div className="flex justify-center mb-8">

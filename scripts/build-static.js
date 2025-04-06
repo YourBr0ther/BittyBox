@@ -17,6 +17,18 @@ function buildStaticSite() {
     console.log('🔨 Building Next.js app in static export mode...');
     execSync('next build', { stdio: 'inherit' });
     
+    // Create a static-mode.json file that indicates this is a static build
+    // Client-side code can fetch this to determine if it's in static mode
+    console.log('📄 Creating static mode indicator file...');
+    fs.writeFileSync(
+      path.join(process.cwd(), 'out', 'static-mode.json'),
+      JSON.stringify({
+        isStatic: true,
+        buildTime: new Date().toISOString(),
+        message: "This is a static build of BittyBox. Some features like authentication and dynamic API routes are not available."
+      }, null, 2)
+    );
+    
     // Ensure .well-known directory exists in the output
     const wellKnownDir = path.join(process.cwd(), 'out', '.well-known');
     const sourceWellKnownDir = path.join(process.cwd(), 'public', '.well-known');

@@ -5,18 +5,25 @@ import type { NextRequest } from 'next/server';
 const validDomains = [
   'localhost:3000',
   'localhost:3001',
+  'localhost:8080',
   '10.0.2.177:3000',
   '10.0.2.177:3001',
+  '10.0.2.177:8080',
   'bittybox.hiddencasa.com'
 ];
+
+// Check if we're in a static export build
+// This is used as a hint since process.env.NEXT_PHASE is only available during build
+const isStaticExport = process.env.NEXT_PHASE === 'phase-export';
 
 export function middleware(request: NextRequest) {
   // Get hostname and path
   const hostname = request.headers.get('host') || '';
   const path = request.nextUrl.pathname;
   
-  // Skip middleware in static export mode
-  if (process.env.NEXT_PHASE === 'phase-export') {
+  // Skip middleware for static exports - this lets Next.js handle the export process
+  if (isStaticExport) {
+    console.log('Static export detected, skipping middleware');
     return NextResponse.next();
   }
   
@@ -81,13 +88,15 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
+// Only run middleware on specific paths, excluding static exports
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
      * - _next/static/images (static images)
      * - favicon.ico (favicon file)
+     * - .well-known (for domain verification)
      */
-    '/((?!_next/static/images|favicon.ico).*)',
+    '/((?!_next/static/images|favicon.ico|.well-known).*)',
   ],
 }; 
