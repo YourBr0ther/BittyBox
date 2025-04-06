@@ -3,11 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Sets up the static site for local access via custom hostname
+ * Builds the static site for use with NGINX Proxy Manager
  */
-function setupLocalStaticSite() {
+function buildStaticSiteForNginx() {
   try {
-    console.log('🚀 Starting local static site setup process...');
+    console.log('🚀 Starting static site build process for NGINX Proxy Manager...');
     
     // Step 1: Make sure we have a clean build
     console.log('🧹 Running clean build...');
@@ -18,29 +18,34 @@ function setupLocalStaticSite() {
     fs.writeFileSync(cnamePath, 'bittybox.hiddencasa.com');
     console.log('📝 Created CNAME file for bittybox.hiddencasa.com');
     
-    // Step 3: Create a hosts file entry message
-    console.log('\n🔧 Local Host Setup Instructions 🔧');
+    // Step 3: Provide NGINX Proxy Manager setup instructions
+    console.log('\n🔧 NGINX Proxy Manager Setup Instructions 🔧');
     console.log('----------------------------------------');
-    console.log('To access your site locally with the custom domain, add this entry to your hosts file:');
-    console.log('\n127.0.0.1  bittybox.hiddencasa.com\n');
-    console.log('Location of hosts file:');
-    console.log('- macOS/Linux: /etc/hosts (requires sudo to edit)');
-    console.log('- Windows: C:\\Windows\\System32\\drivers\\etc\\hosts');
-    console.log('----------------------------------------\n');
+    console.log('To serve your static site with NGINX Proxy Manager:');
+    console.log('\n1. In NGINX Proxy Manager, add a new "Proxy Host"');
+    console.log('2. Set Domain Names: bittybox.hiddencasa.com');
+    console.log('3. For Scheme: select http://');
+    console.log(`4. For Forward Hostname/IP: your server IP address`);
+    console.log('5. For Forward Port: the port your static file server is running on');
+    console.log('6. Under "SSL" tab, enable SSL if desired');
+    console.log('\nFor the actual file serving, use one of these options:');
+    console.log(`a) Run: npx serve -p 8080 ${path.resolve(process.cwd(), 'out')}`);
+    console.log('b) Configure a local nginx server to serve the static files');
+    console.log('----------------------------------------');
     
-    // Step 4: Serve the static site
-    console.log('📡 Starting local server...');
-    console.log('✅ Your site will be available at: http://bittybox.hiddencasa.com:3000');
-    console.log('Press Ctrl+C to stop the server when done.\n');
+    // Step 4: Show path to static files
+    console.log(`\n✅ Static site build completed successfully!`);
+    console.log(`📂 Output is available in: ${path.resolve(process.cwd(), 'out')}`);
     
-    // Serve on port 3000 by default
-    execSync('npx serve -p 3000 out', { stdio: 'inherit' });
-
+    // Ask if user wants to start a local server
+    console.log('\nWould you like to start a local server now?');
+    console.log('Run: npm run serve:static');
+    
   } catch (error) {
     console.error('❌ Setup failed:', error);
     process.exit(1);
   }
 }
 
-// Run the local setup
-setupLocalStaticSite(); 
+// Run the build
+buildStaticSiteForNginx(); 
