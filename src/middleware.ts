@@ -5,14 +5,17 @@ import type { NextRequest } from 'next/server';
 const validDomains = [
   'localhost:3000',
   'localhost:3001',
+  '10.0.2.177:3000',
+  '10.0.2.177:3001',
   'bittybox.hiddencasa.com'
 ];
 
 export function middleware(request: NextRequest) {
-  // Get hostname (e.g. vercel.com, example.com)
+  // Get hostname and path
   const hostname = request.headers.get('host') || '';
   const path = request.nextUrl.pathname;
-
+  const origin = request.headers.get('origin') || '';
+  
   // Handle CORS preflight requests
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, {
@@ -25,7 +28,18 @@ export function middleware(request: NextRequest) {
       },
     });
   }
-
+  
+  // Check for _next/static resources loading from production domain to local host
+  const isNextStaticRequest = path.includes('/_next/static') || path.includes('/_next/webpack-hmr');
+  const isProductionDomainRequest = hostname.includes('bittybox.hiddencasa.com');
+  
+  if (isNextStaticRequest && isProductionDomainRequest) {
+    // For production domain requesting static assets from local dev, redirect to public fallback
+    if (path.includes('settings/page.js')) {
+      return NextResponse.redirect(`${request.nextUrl.origin}/loading-fallback.html`);
+    }
+  }
+  
   // Validate domain
   const isValidDomain = validDomains.some(domain => hostname.includes(domain));
   if (!isValidDomain) {
@@ -33,17 +47,19 @@ export function middleware(request: NextRequest) {
     // Redirect invalid domains to production
     return NextResponse.redirect('https://bittybox.hiddencasa.com');
   }
-
+  
   // Special handling for the settings route 
-  if (path === '/settings' && hostname.includes('bittybox.hiddencasa.com')) {
-    // Add CORS headers to the response
+  if (path === '/settings') {
     const response = NextResponse.next();
+    
+    // Add CORS headers to all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
     return response;
   }
-
+  
   // Add CORS headers to all responses
   const response = NextResponse.next();
   response.headers.set('Access-Control-Allow-Origin', '*');
@@ -54,11 +70,9 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
+     * - _next/static/images (static images)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static/images|favicon.ico).*)',
   ],
 }; 

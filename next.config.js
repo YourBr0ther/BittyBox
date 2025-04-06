@@ -4,12 +4,15 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com', 'i.ytimg.com'],
   },
+  crossOrigin: 'anonymous',
   experimental: {
     // Allow cross-origin requests from the production domain during development
     allowedDevOrigins: [
       'https://bittybox.hiddencasa.com',
       'http://10.0.2.177:3000',
-      'http://10.0.2.177'
+      'http://10.0.2.177',
+      'http://localhost:3000',
+      'http://localhost:3001'
     ],
   },
   async headers() {
@@ -48,6 +51,20 @@ const nextConfig = {
           }
         ],
       },
+      {
+        // Special headers for Next.js static files
+        source: '/_next/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          }
+        ],
+      },
     ];
   },
   // Expose environment variables to the browser
@@ -56,6 +73,8 @@ const nextConfig = {
   },
   // Ensure output is properly configured
   output: 'standalone',
+  // Disable strict mode for production
+  productionBrowserSourceMaps: false,
 };
 
 module.exports = nextConfig; 
