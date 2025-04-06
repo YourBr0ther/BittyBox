@@ -14,7 +14,11 @@ export function middleware(request: NextRequest) {
   // Get hostname and path
   const hostname = request.headers.get('host') || '';
   const path = request.nextUrl.pathname;
-  const origin = request.headers.get('origin') || '';
+  
+  // Skip middleware in static export mode
+  if (process.env.NEXT_PHASE === 'phase-export') {
+    return NextResponse.next();
+  }
   
   // Handle CORS preflight requests
   if (request.method === 'OPTIONS') {
@@ -28,6 +32,17 @@ export function middleware(request: NextRequest) {
       },
     });
   }
+  
+  // Handle static routes in production
+  if (process.env.NODE_ENV === 'production') {
+    // Add CORS headers to all responses
+    const response = NextResponse.next();
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Cache-Control', 'public, max-age=3600');
+    return response;
+  }
+  
+  // For development server:
   
   // Check for _next/static resources loading from production domain to local host
   const isNextStaticRequest = path.includes('/_next/static') || path.includes('/_next/webpack-hmr');

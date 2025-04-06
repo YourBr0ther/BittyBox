@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, signOut, useSession } from 'next-auth/react';
-import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser, FaDownload } from 'react-icons/fa';
+import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser, FaDownload, FaInfoCircle } from 'react-icons/fa';
 import PlaylistUploader from '@/components/Playlists/PlaylistUploader';
 import { YouTubeService, type Playlist } from '@/services/youtubeService';
 
@@ -24,11 +23,26 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<'general' | 'playlists' | 'account'>('general');
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isStatic, setIsStatic] = useState(false);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const router = useRouter();
-  const { data: session, status } = useSession();
-  const isLoading = status === 'loading';
   
+  useEffect(() => {
+    // Check if we're in a static environment (no API endpoints)
+    const checkStatic = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        // If we get a 404, we're in a static environment
+        setIsStatic(response.status === 404);
+      } catch (error) {
+        // If the fetch fails, we're in a static environment
+        setIsStatic(true);
+      }
+    };
+    
+    checkStatic();
+  }, []);
+
   useEffect(() => {
     // Check if app is already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -82,11 +96,25 @@ export default function SettingsPage() {
   };
   
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/settings?tab=account' });
+    if (isStatic) {
+      // In static site, just show an alert
+      alert('Authentication is not available in static site mode. Please use the live version of the site to sign in.');
+      return;
+    }
+    
+    // Regular sign in for dev or non-static builds
+    window.location.href = '/api/auth/signin/google?callbackUrl=/settings?tab=account';
   };
   
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/settings?tab=account' });
+    if (isStatic) {
+      // In static site, just show an alert
+      alert('Authentication is not available in static site mode. Please use the live version of the site to sign out.');
+      return;
+    }
+    
+    // Regular sign out for dev or non-static builds
+    window.location.href = '/api/auth/signout?callbackUrl=/settings?tab=account';
   };
   
   const handleInstallApp = async () => {
@@ -110,6 +138,34 @@ export default function SettingsPage() {
       console.log('User dismissed the install prompt');
     }
   };
+  
+  // Render the account section for static builds
+  const renderStaticAccount = () => (
+    <div className="mb-8">
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <FaInfoCircle className="h-5 w-5 text-yellow-400" />
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-yellow-700">
+              <strong>Static Site Mode:</strong> Authentication with Google is not available in this static deployment. Please use the live version of the site to sign in.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-center mb-8">
+        <button 
+          onClick={handleSignIn}
+          className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-6 border border-gray-400 rounded-lg shadow flex items-center opacity-60 cursor-not-allowed"
+          disabled
+        >
+          <FaGoogle className="mr-2 text-[#4285F4]" /> Sign in with Google (Disabled in Static Mode)
+        </button>
+      </div>
+    </div>
+  );
   
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -262,44 +318,8 @@ export default function SettingsPage() {
             Connect your Google account to enable YouTube Premium features.
           </p>
           
-          {isLoading ? (
-            <div className="flex justify-center mb-8">
-              <div className="w-10 h-10 border-4 border-pink-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : session ? (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6 p-4 bg-pink-light/50 rounded-lg">
-                <div className="flex items-center">
-                  {session.user?.image ? (
-                    <img 
-                      src={session.user.image} 
-                      alt={session.user?.name || 'User'} 
-                      className="w-12 h-12 rounded-full mr-4" 
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-pink-primary flex items-center justify-center mr-4">
-                      <FaUser className="text-white" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-bold">{session.user?.name}</p>
-                    <p className="text-sm text-gray-600">{session.user?.email}</p>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={handleSignOut}
-                  className="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center"
-                >
-                  <FaSignOutAlt className="mr-2 text-pink-primary" /> Sign Out
-                </button>
-              </div>
-              
-              <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
-                <p className="font-semibold text-green-700">Connected to YouTube</p>
-                <p className="text-sm text-green-600">Your YouTube Premium account is now connected.</p>
-              </div>
-            </div>
+          {isStatic ? (
+            renderStaticAccount()
           ) : (
             <div className="flex justify-center mb-8">
               <button 

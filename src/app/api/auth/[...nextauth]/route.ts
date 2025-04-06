@@ -2,6 +2,22 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { JWT } from 'next-auth/jwt';
 import { Session } from 'next-auth';
+import { cookies } from 'next/headers';
+
+// Add the force-static directive for static exports
+export const dynamic = 'force-static';
+
+// Generate static parameters for the [...nextauth] route
+export function generateStaticParams() {
+  return [
+    { nextauth: ['session'] },
+    { nextauth: ['signin'] },
+    { nextauth: ['signout'] },
+    { nextauth: ['callback', 'google'] },
+    { nextauth: ['csrf'] },
+    { nextauth: ['providers'] },
+  ];
+}
 
 // Extend the built-in session types
 interface ExtendedSession extends Session {
