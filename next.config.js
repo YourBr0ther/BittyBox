@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Comment out static export settings
-  // output: 'export',
-  // distDir: 'out',
+  // Enable standalone output for Docker
+  output: 'standalone',
   
   // Keep images optimization for normal development 
   images: {
