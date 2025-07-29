@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FaCog, FaGoogle, FaListUl, FaArrowLeft, FaSignOutAlt, FaUser, FaDownload, FaInfoCircle } from 'react-icons/fa';
 import PlaylistUploader from '@/components/Playlists/PlaylistUploader';
+import AddPlaylistByUrl from '@/components/Playlists/AddPlaylistByUrl';
 import { YouTubeService, type Playlist } from '@/services/youtubeService';
 
 // Define the BeforeInstallPromptEvent interface
@@ -19,12 +20,47 @@ declare global {
 }
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [tab, setTab] = useState<'general' | 'playlists' | 'account'>('general');
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [tab, setTab] = useState<'general' | 'playlists' | 'account'>(
+    (searchParams?.get('tab') as 'general' | 'playlists' | 'account') || 'general'
+  );
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const router = useRouter();
+
+  // Handle hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Update tab when URL changes
+  useEffect(() => {
+    if (!isHydrated) return;
+    
+    const tabParam = searchParams?.get('tab') as 'general' | 'playlists' | 'account';
+    if (tabParam && ['general', 'playlists', 'account'].includes(tabParam)) {
+      setTab(tabParam);
+    }
+  }, [searchParams, isHydrated]);
+
+  // Load playlists
+  useEffect(() => {
+    if (!isHydrated) return;
+    
+    const loadPlaylists = async () => {
+      try {
+        const fetchedPlaylists = await YouTubeService.getPlaylists();
+        setPlaylists(fetchedPlaylists);
+      } catch (error) {
+        console.error('Failed to load playlists:', error);
+      }
+    };
+    
+    loadPlaylists();
+  }, [isHydrated]);
 
   useEffect(() => {
     // Check if app is already installed
@@ -54,19 +90,6 @@ export default function SettingsPage() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
     };
-  }, []);
-  
-  useEffect(() => {
-    const loadPlaylists = async () => {
-      try {
-        const fetchedPlaylists = await YouTubeService.getPlaylists();
-        setPlaylists(fetchedPlaylists);
-      } catch (error) {
-        console.error('Failed to load playlists:', error);
-      }
-    };
-    
-    loadPlaylists();
   }, []);
   
   const handleBackToPlayer = () => {
@@ -104,12 +127,34 @@ export default function SettingsPage() {
     setIsInstallable(false);
     
     if (choiceResult.outcome === 'accepted') {
-      console.log('User accepted the install prompt');
+      // User accepted the install prompt
     } else {
-      console.log('User dismissed the install prompt');
+      // User dismissed the install prompt
     }
   };
   
+  const handleTabChange = (newTab: 'general' | 'playlists' | 'account') => {
+    setTab(newTab);
+    // Use replace instead of push to avoid building up history
+    router.replace(`/settings?tab=${newTab}`);
+  };
+
+  // Don't render until hydrated to avoid mismatch
+  if (!isHydrated) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-pink-accent flex items-center">
+            <FaCog className="mr-2" /> Parent Settings
+          </h1>
+        </div>
+        <div className="text-center py-8">
+          <div className="w-10 h-10 border-4 border-pink-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
@@ -127,19 +172,19 @@ export default function SettingsPage() {
       <div className="flex mb-6 border-b border-pink-light">
         <button
           className={`py-3 px-6 font-semibold ${tab === 'general' ? 'text-pink-accent border-b-2 border-pink-accent' : 'text-pink-dark'}`}
-          onClick={() => setTab('general')}
+          onClick={() => handleTabChange('general')}
         >
           General
         </button>
         <button
           className={`py-3 px-6 font-semibold ${tab === 'playlists' ? 'text-pink-accent border-b-2 border-pink-accent' : 'text-pink-dark'}`}
-          onClick={() => setTab('playlists')}
+          onClick={() => handleTabChange('playlists')}
         >
           Playlists
         </button>
         <button
           className={`py-3 px-6 font-semibold ${tab === 'account' ? 'text-pink-accent border-b-2 border-pink-accent' : 'text-pink-dark'}`}
-          onClick={() => setTab('account')}
+          onClick={() => handleTabChange('account')}
         >
           Account
         </button>
@@ -222,10 +267,19 @@ export default function SettingsPage() {
           <div className="card p-6 mb-6">
             <h2 className="text-2xl font-bold text-pink-primary mb-4">Manage Playlists</h2>
             <p className="mb-6 text-pink-dark">
-              Import playlists from a CSV file or manage existing ones.
+              Add playlists by entering a YouTube URL or importing from a CSV file.
             </p>
             
-            <PlaylistUploader onPlaylistsImported={handleImportPlaylists} />
+            <AddPlaylistByUrl 
+              onPlaylistAdded={(playlist) => {
+                setPlaylists((prevPlaylists) => [...prevPlaylists, playlist]);
+              }} 
+            />
+            
+            <div className="mt-8 border-t border-pink-light pt-8">
+              <h3 className="text-xl font-bold text-pink-primary mb-4">Import from CSV</h3>
+              <PlaylistUploader onPlaylistsImported={handleImportPlaylists} />
+            </div>
           </div>
           
           <div className="card p-6">
@@ -247,7 +301,7 @@ export default function SettingsPage() {
               </ul>
             ) : (
               <p className="text-center py-8 text-pink-dark">
-                No playlists imported yet. Use the uploader above to add playlists.
+                No playlists added yet. Add a playlist URL above or import from CSV.
               </p>
             )}
           </div>

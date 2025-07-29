@@ -31,10 +31,25 @@ interface YouTubePlayerProps {
   autoplay?: boolean;
 }
 
+// YouTube API types
+interface YouTubePlayer {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  destroy: () => void;
+}
+
+interface YouTubeEvent {
+  data: number;
+}
+
 // Add YouTube API types
 declare global {
   interface Window {
-    YT: any;
+    YT: {
+      Player: new (element: HTMLElement, config: any) => YouTubePlayer;
+    };
     onYouTubeIframeAPIReady: () => void;
   }
 }
@@ -54,7 +69,7 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(({
   onReady,
   autoplay = true,
 }, ref) => {
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<YouTubePlayer | null>(null);
   const playerElementRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const { data: session } = useSession();
@@ -130,11 +145,11 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(({
               setIsReady(true);
               if (onReady) onReady();
             },
-            onStateChange: (event: any) => {
+            onStateChange: (event: YouTubeEvent) => {
               if (!isMounted) return;
               if (onStateChange) onStateChange(event.data);
             },
-            onError: (event: any) => {
+            onError: (event: YouTubeEvent) => {
               if (!isMounted) return;
               if (onError) onError(event.data);
             },

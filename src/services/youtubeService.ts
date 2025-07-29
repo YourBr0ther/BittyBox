@@ -14,7 +14,7 @@ interface Song {
   videoId: string;
 }
 
-interface Playlist {
+export interface Playlist {
   id: string;
   name: string;
   icon: string;
@@ -26,12 +26,32 @@ interface Playlist {
 const playlistCache = new Map<string, Playlist>();
 const songCache = new Map<string, Song[]>();
 
+// YouTube API types
+interface YouTubeAPIResponse {
+  items: YouTubeItem[];
+}
+
+interface YouTubeItem {
+  id: string;
+  snippet: {
+    title: string;
+    thumbnails: {
+      default?: { url: string };
+      high?: { url: string };
+    };
+    videoOwnerChannelTitle?: string;
+    resourceId?: {
+      videoId: string;
+    };
+  };
+}
+
 // YouTube API configuration
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const DEFAULT_ICONS = ['star', 'heart', 'magic', 'cat', 'dog', 'icecream'];
 
 // Helper to extract playlist ID from YouTube URL
-const extractPlaylistId = (url: string): string | null => {
+export const extractPlaylistId = (url: string): string | null => {
   const regex = /(?:list=)([a-zA-Z0-9_-]+)/;
   const match = url.match(regex);
   return match ? match[1] : null;
@@ -70,7 +90,7 @@ export const YouTubeService = {
   /**
    * Make authenticated API request to YouTube
    */
-  fetchFromYouTube: async (endpoint: string, authenticated: boolean = true): Promise<any> => {
+  fetchFromYouTube: async (endpoint: string, authenticated: boolean = true): Promise<YouTubeAPIResponse> => {
     // Always include API key for fallback
     const apiKey = `key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || ''}`;
     const apiKeyParam = endpoint.includes('?') ? `&${apiKey}` : `?${apiKey}`;
@@ -92,7 +112,7 @@ export const YouTubeService = {
           }
           
           const errorData = await response.json();
-          console.warn('Authenticated request failed, falling back to API key:', errorData);
+          // Authenticated request failed, falling back to API key
           
           // If using 'mine' parameter but not authorized, we can't use API key as fallback
           if (usesMineParam) {
@@ -100,14 +120,14 @@ export const YouTubeService = {
           }
           // Otherwise, fall through to API key method
         } catch (error) {
-          console.warn('Auth error, falling back to API key:', error);
+          // Auth error, falling back to API key
           
           // If using 'mine' parameter but not authorized, we can't use API key as fallback
           if (usesMineParam && (error instanceof Error)) {
             // For playlists endpoint, replace 'mine=true' with category filter
             if (endpoint.includes('/playlists')) {
               // Need to use a valid filter parameter like channelId
-              console.log('Using popular music playlists instead of user playlists');
+              // Using popular music playlists instead of user playlists
               return {
                 items: [
                   {
@@ -204,12 +224,25 @@ export const YouTubeService = {
    */
   getPlaylists: async (): Promise<Playlist[]> => {
     try {
-      // Try to fetch authenticated playlists
+      // First try to get playlists from local storage
+      const storedPlaylists = typeof localStorage !== 'undefined' ? 
+        localStorage.getItem('bittybox_playlists') : null;
+        
+      if (storedPlaylists) {
+        const parsedPlaylists = JSON.parse(storedPlaylists);
+        // Update cache with stored playlists
+        parsedPlaylists.forEach((playlist: Playlist) => {
+          playlistCache.set(playlist.id, playlist);
+        });
+        return parsedPlaylists;
+      }
+
+      // If no stored playlists, try to fetch from YouTube
       const data = await YouTubeService.fetchFromYouTube(
         '/playlists?part=snippet&mine=true&maxResults=50'
       );
       
-      const playlists: Playlist[] = data.items.map((item: any, index: number) => {
+      const playlists: Playlist[] = data.items.map((item: YouTubeItem, index: number) => {
         const playlist: Playlist = {
           id: item.id,
           name: item.snippet.title,
@@ -223,36 +256,17 @@ export const YouTubeService = {
         return playlist;
       });
       
-      // Store in local storage as backup
-      localStorage.setItem('bittybox_playlists', JSON.stringify(playlists));
+      // Store in local storage
+      if (playlists.length > 0) {
+        localStorage.setItem('bittybox_playlists', JSON.stringify(playlists));
+      }
       
       return playlists;
     } catch (error) {
       console.error('Error fetching playlists:', error);
       
-      // If authenticated request fails or no session, use local storage or fallback to sample playlists
-      const storedPlaylists = typeof localStorage !== 'undefined' ? 
-        localStorage.getItem('bittybox_playlists') : null;
-        
-      if (storedPlaylists) {
-        return JSON.parse(storedPlaylists);
-      }
-      
-      // Return sample playlists when nothing else is available
-      return [
-        {
-          id: 'PLpFAqWzr89nm8ZDNfOxQ6r8sbIVZLZ7yu',
-          name: 'Kids Songs & Stories',
-          icon: 'star',
-          url: 'https://www.youtube.com/playlist?list=PLpFAqWzr89nm8ZDNfOxQ6r8sbIVZLZ7yu'
-        },
-        {
-          id: 'PL2qcTIIqLo7WhNmWKBToK8lOp6deuFa-t',
-          name: 'Nursery Rhymes',
-          icon: 'heart',
-          url: 'https://www.youtube.com/playlist?list=PL2qcTIIqLo7WhNmWKBToK8lOp6deuFa-t'
-        }
-      ];
+      // Return empty array if nothing is available
+      return [];
     }
   },
   
@@ -306,7 +320,7 @@ export const YouTubeService = {
         `/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}`
       );
       
-      const songs: Song[] = data.items.map((item: any, index: number) => {
+      const songs: Song[] = data.items.map((item: YouTubeItem, index: number) => {
         const song: Song = {
           id: item.id,
           title: item.snippet.title,
@@ -316,7 +330,7 @@ export const YouTubeService = {
         };
         
         return song;
-      });
+      }).filter(song => song.videoId); // Filter out invalid videos
       
       // Cache the songs
       songCache.set(playlistId, songs);
@@ -347,7 +361,7 @@ export const YouTubeService = {
         const playlistId = extractPlaylistId(url);
         
         if (!playlistId) {
-          console.warn(`Invalid YouTube playlist URL: ${url}`);
+          // Skip invalid YouTube playlist URL
           continue;
         }
         
@@ -391,8 +405,52 @@ export const YouTubeService = {
    * Load a YouTube video for playback
    */
   playSong: async (videoId: string): Promise<void> => {
-    console.log(`Playing video ID: ${videoId}`);
+    // Playing video ID: ${videoId}
     // This will be implemented in the YouTube player component
+  },
+
+  /**
+   * Get details for a specific playlist
+   */
+  getPlaylistDetails: async (playlistId: string): Promise<Playlist> => {
+    try {
+      const data = await YouTubeService.fetchFromYouTube(
+        `/playlists?part=snippet&id=${playlistId}`
+      );
+
+      if (!data.items || data.items.length === 0) {
+        throw new Error('Playlist not found');
+      }
+
+      const item = data.items[0];
+      const playlist: Playlist = {
+        id: item.id,
+        name: item.snippet.title,
+        icon: DEFAULT_ICONS[Math.floor(Math.random() * DEFAULT_ICONS.length)],
+        url: `https://www.youtube.com/playlist?list=${item.id}`,
+      };
+
+      // Cache the playlist
+      playlistCache.set(item.id, playlist);
+
+      // Get existing playlists from storage
+      const storedPlaylists = localStorage.getItem('bittybox_playlists');
+      const existingPlaylists = storedPlaylists ? JSON.parse(storedPlaylists) : [];
+      
+      // Check if playlist already exists
+      const playlistExists = existingPlaylists.some((p: Playlist) => p.id === playlist.id);
+      
+      if (!playlistExists) {
+        // Add new playlist and save back to storage
+        existingPlaylists.push(playlist);
+        localStorage.setItem('bittybox_playlists', JSON.stringify(existingPlaylists));
+      }
+
+      return playlist;
+    } catch (error) {
+      console.error('Error fetching playlist details:', error);
+      throw new Error('Failed to fetch playlist details');
+    }
   },
 };
 
