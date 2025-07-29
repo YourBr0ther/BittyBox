@@ -326,7 +326,7 @@ export const YouTubeService = {
           title: item.snippet.title,
           artist: item.snippet.videoOwnerChannelTitle || 'Unknown Artist',
           thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
-          videoId: item.snippet.resourceId.videoId,
+          videoId: item.snippet.resourceId?.videoId || '',
         };
         
         return song;
@@ -454,4 +454,4 @@ export const YouTubeService = {
   },
 };
 
-export type { Song, Playlist }; 
+export type { Song }; 
