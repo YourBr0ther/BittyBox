@@ -1,297 +1,218 @@
-# BittyBox 🎵
+# BittyBox
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/yourbr0ther/bittybox)](https://hub.docker.com/r/yourbr0ther/bittybox)
-[![Docker Image Size](https://img.shields.io/docker/image-size/yourbr0ther/bittybox/latest)](https://hub.docker.com/r/yourbr0ther/bittybox)
-[![GitHub Actions](https://github.com/YourBr0ther/BittyBox/workflows/Build%20and%20Push%20Docker%20Image%20to%20Docker%20Hub/badge.svg)](https://github.com/YourBr0ther/BittyBox/actions)
+A kid-friendly NFC music player that lets children play their favorite playlists by tapping physical "Dots" (NFC tags) on an Android tablet. Integrates with Home Assistant to control smart speakers.
 
-A kid-friendly, touchscreen music player for YouTube playlists, designed specifically for young children. Features a beautiful, pink interface that makes playing music simple and fun!
+## Features
 
-## ✨ Features
+- **NFC Dots** - Tap an NFC tag to instantly play a playlist on your smart speaker
+- **Kid-Friendly UI** - Colorful, animated interface designed for children ages 3-8
+- **Home Assistant Integration** - Control any media player through Home Assistant
+- **Voice Feedback** - Optional TTS announces what's playing (via NanoGPT)
+- **Admin Panel** - PIN-protected settings for parents to configure Dots
+- **PWA Support** - Install on tablets for a full-screen, app-like experience
 
-- 🎨 **Child-friendly interface** with large, colorful buttons perfect for small hands
-- 🎵 **YouTube integration** with support for playlists and individual videos
-- 📱 **Progressive Web App (PWA)** - install on tablets and phones
-- 🐳 **Docker ready** - deploy anywhere with one command
-- 📑 **Flexible playlist management** via URLs or CSV import
-- 🖼️ **Visual playlist selection** with custom icons and thumbnails
-- 🔒 **Parent settings** with secure configuration options
-- 🎯 **Touch-optimized** design for tablets and touchscreen devices
-- 🌐 **Offline support** with service worker caching
-- 🎮 **Simple controls** designed for ages 3-8
+## How It Works
 
-## 🚀 Quick Start
+1. Parent configures a "Dot" in the admin panel (scans NFC tag, assigns playlist)
+2. Child taps the Dot on the tablet
+3. Music starts playing on the configured smart speaker
+4. Child sees a fun "Now Playing" screen with animations
 
-### Option 1: Docker (Recommended)
+## Requirements
 
-**Run immediately with Docker:**
+- Android tablet with NFC and Chrome browser
+- Home Assistant instance with a media player entity
+- NFC tags (NTAG213/215/216 recommended)
+- Docker or Kubernetes for deployment
+
+## Quick Start
+
+### Docker
+
 ```bash
 docker run -d \
   -p 3000:3000 \
-  -e NEXT_PUBLIC_YOUTUBE_API_KEY=your_api_key \
-  -e NEXTAUTH_SECRET=your_secret \
+  -v bittybox-data:/data \
+  -e HA_URL=http://your-home-assistant:8123 \
+  -e HA_TOKEN=your-long-lived-access-token \
+  -e HA_SPEAKER_ENTITY=media_player.living_room \
+  -e NEXTAUTH_SECRET=$(openssl rand -base64 32) \
+  -e NEXTAUTH_URL=http://localhost:3000 \
   --name bittybox \
   yourbr0ther/bittybox:latest
 ```
 
-**Or use Docker Compose:**
-```bash
-git clone https://github.com/YourBr0ther/BittyBox.git
-cd BittyBox
-# Edit docker-compose.yml with your environment variables
-docker-compose up -d
-```
+### Docker Compose
 
-### Option 2: Traditional Setup
-
-**Prerequisites:**
-- Node.js 18+
-- npm or yarn
-
-**Installation:**
-```bash
-git clone https://github.com/YourBr0ther/BittyBox.git
-cd BittyBox
-npm install
-```
-
-**Environment Setup:**
-Create `.env.local` with:
-```bash
-# Required
-NEXT_PUBLIC_YOUTUBE_API_KEY=your_youtube_api_key
-NEXTAUTH_SECRET=your_random_secret_key
-NEXTAUTH_URL=http://localhost:3000
-
-# Optional (for Google OAuth)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-```
-
-**Run:**
-```bash
-npm run dev
-# Visit http://localhost:3000
-```
-
-## 🐳 Docker Hub
-
-BittyBox is available on Docker Hub with multi-architecture support:
-
-- **Latest stable:** `yourbr0ther/bittybox:latest`
-- **Specific version:** `yourbr0ther/bittybox:v1.0.0`
-- **Platforms:** linux/amd64, linux/arm64
-
-### Docker Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_YOUTUBE_API_KEY` | Yes | YouTube Data API v3 key |
-| `NEXTAUTH_SECRET` | Yes | Random secret for session encryption |
-| `NEXTAUTH_URL` | Yes | Your app's URL (e.g., http://localhost:3000) |
-| `GOOGLE_CLIENT_ID` | No | For Google OAuth integration |
-| `GOOGLE_CLIENT_SECRET` | No | For Google OAuth integration |
-
-## 📱 Progressive Web App
-
-BittyBox can be installed as a PWA on tablets and phones:
-
-1. Visit the app in Chrome/Safari
-2. Look for "Install" prompt or "Add to Home Screen"
-3. Install for full-screen, app-like experience
-4. Works offline with cached playlists
-
-## 🎵 Setup Guide
-
-### 1. Get YouTube API Key
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable YouTube Data API v3
-4. Create API credentials (API Key)
-5. Restrict the key to YouTube Data API v3
-
-### 2. Configure Playlists
-
-**Method 1: URL Import**
-- Go to Settings → Playlists
-- Paste YouTube playlist URL
-- Click "Add Playlist"
-
-**Method 2: CSV Import**
-- Create CSV file: `name,url,icon`
-- Example: `Kids Songs,https://youtube.com/playlist?list=ABC123,star`
-- Import via Settings → Playlists → Import CSV
-
-### 3. Optional: Google OAuth
-
-For enhanced features (your personal playlists, ad-free with Premium):
-
-1. Google Cloud Console → APIs & Services → Credentials
-2. Create OAuth 2.0 Client ID
-3. Add authorized redirect URI: `http://your-domain/api/auth/callback/google`
-4. Add credentials to environment variables
-
-## 🛠️ Development
-
-### Local Development
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-```
-
-### Docker Development
-```bash
-# Build local image
-docker build -t bittybox-dev .
-
-# Run with development setup
-docker-compose -f docker-compose.dev.yml up
-```
-
-### Code Structure
-```
-src/
-├── app/                 # Next.js 13+ app directory
-│   ├── page.tsx        # Main player interface
-│   └── settings/       # Parent settings
-├── components/         # React components
-│   ├── Player/         # Music player components
-│   └── Playlists/      # Playlist management
-├── services/           # API services
-└── styles/             # Global styles
-```
-
-## 🚀 Deployment
-
-### Docker Deployment
-
-**Single Container:**
-```bash
-docker run -d \
-  -p 80:3000 \
-  -e NEXT_PUBLIC_YOUTUBE_API_KEY=your_key \
-  -e NEXTAUTH_SECRET=your_secret \
-  -e NEXTAUTH_URL=https://your-domain.com \
-  --restart unless-stopped \
-  yourbr0ther/bittybox:latest
-```
-
-**With Docker Compose:**
 ```yaml
-version: '3.8'
 services:
   bittybox:
     image: yourbr0ther/bittybox:latest
     ports:
-      - "80:3000"
-    environment:
-      - NEXT_PUBLIC_YOUTUBE_API_KEY=your_key
-      - NEXTAUTH_SECRET=your_secret
-      - NEXTAUTH_URL=https://your-domain.com
+      - "3000:3000"
+    volumes:
+      - bittybox-data:/data
+    env_file: .env
     restart: unless-stopped
+
+volumes:
+  bittybox-data:
 ```
 
-### Traditional Hosting
+Create a `.env` file:
 
-Deploy to Vercel, Netlify, or any Node.js hosting:
 ```bash
-npm run build
-npm start
+# Home Assistant
+HA_URL=http://your-home-assistant:8123
+HA_TOKEN=your-long-lived-access-token
+HA_SPEAKER_ENTITY=media_player.living_room
+
+# Auth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate-with-openssl-rand-base64-32
+
+# Optional: Google OAuth for YouTube features
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+NEXT_PUBLIC_YOUTUBE_API_KEY=your-youtube-api-key
+
+# Optional: Voice feedback
+NANO_GPT_API_KEY=your-nanogpt-api-key
+
+# Admin PIN (default: 1234)
+NEXT_PUBLIC_ADMIN_PIN=1234
 ```
 
-## 📋 Features in Detail
+## Configuration
 
-### Child-Friendly Design
-- Large, colorful buttons (minimum 60px touch targets)
-- Simple navigation with visual cues
-- Pink/purple color scheme appealing to children
-- Minimal text, maximum visual elements
-- Loading animations and feedback
+### Home Assistant Setup
 
-### Playlist Management
-- Support for YouTube playlist URLs
-- CSV import for bulk playlist addition
-- Custom icons for easy playlist identification
-- Thumbnail preview for visual selection
-- Local storage for offline access
+1. Generate a Long-Lived Access Token in Home Assistant:
+   - Profile → Security → Long-Lived Access Tokens → Create Token
 
-### Safety Features
-- No direct YouTube navigation
-- Parent-controlled settings access
-- No advertisements (with proper API setup)
-- Secure authentication handling
-- Private playlist support
+2. Find your speaker entity ID:
+   - Developer Tools → States → Search for `media_player`
 
-## 🔧 Troubleshooting
+3. Ensure the media player supports `media_player.play_media` service
 
-### Common Issues
+### Creating Dots
 
-**"API key not working"**
-- Ensure YouTube Data API v3 is enabled
-- Check API key restrictions
-- Verify quota limits
+1. Visit `/admin` on your BittyBox instance
+2. Enter the admin PIN (default: 1234)
+3. Click "Add New Dot"
+4. Tap "Scan Dot" and hold an NFC tag to the tablet
+5. Enter playlist name and YouTube Music URL
+6. Choose an icon and color
+7. Save
 
-**"Playlists not loading"**
-- Check network connectivity
-- Verify API key permissions
-- Check browser console for errors
+### NFC Tag Tips
 
-**"Docker container won't start"**
-- Verify environment variables are set
-- Check port 3000 availability
-- Review container logs: `docker logs bittybox`
+- Use NTAG213 (144 bytes), NTAG215 (504 bytes), or NTAG216 (888 bytes)
+- Tags don't need to be pre-formatted
+- Each tag has a unique serial number used for identification
+- Blank tags work fine - BittyBox only reads the tag ID
 
-**"OAuth not working"**
-- Verify redirect URLs in Google Console
-- Check NEXTAUTH_URL matches your domain
-- Ensure NEXTAUTH_SECRET is set
+## Environment Variables
 
-### Getting Help
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `HA_URL` | Yes | Home Assistant URL (e.g., `http://10.0.2.180:8123`) |
+| `HA_TOKEN` | Yes | Home Assistant Long-Lived Access Token |
+| `HA_SPEAKER_ENTITY` | Yes | Media player entity ID (e.g., `media_player.living_room`) |
+| `NEXTAUTH_SECRET` | Yes | Random secret for session encryption |
+| `NEXTAUTH_URL` | Yes | Your app's public URL |
+| `NEXT_PUBLIC_ADMIN_PIN` | No | Admin PIN (default: `1234`) |
+| `NANO_GPT_API_KEY` | No | NanoGPT API key for TTS voice feedback |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `NEXT_PUBLIC_YOUTUBE_API_KEY` | No | YouTube Data API key |
 
-1. Check [Docker documentation](./DOCKER.md)
-2. Review [GitHub Issues](https://github.com/YourBr0ther/BittyBox/issues)
-3. Check container logs for errors
-4. Verify all environment variables
+## Kubernetes Deployment
 
-## 🤝 Contributing
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full Kubernetes/k3s deployment instructions including:
+- PersistentVolumeClaim for NFC mappings
+- Secret configuration
+- Deployment with health checks
+- Traefik IngressRoute
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+## Development
 
-### Quick Contribution Guide
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+```bash
+# Install dependencies
+npm install
 
-## 📄 License
+# Create .env.local with your config
+cp .env.example .env.local
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+# Run development server
+npm run dev
 
-## 🙏 Acknowledgments
+# Run tests
+npm test
 
-- **Next.js** - React framework for production
-- **YouTube Data API** - Playlist and video data
-- **Docker** - Containerization platform
-- **Tailwind CSS** - Utility-first CSS framework
-- **NextAuth.js** - Authentication solution
-- **React Icons** - Beautiful icon library
+# Build for production
+npm run build
+```
 
-## 🎯 Roadmap
+## Project Structure
 
-- [ ] Multi-language support
-- [ ] Custom themes and colors
-- [ ] Parental controls and time limits
-- [ ] Offline playlist download
-- [ ] Voice commands
-- [ ] Integration with Spotify/Apple Music
+```
+src/
+├── app/
+│   ├── page.tsx              # Main NFC scanning interface
+│   ├── admin/page.tsx        # Admin panel with PIN gate
+│   └── api/
+│       ├── dots/             # CRUD for Dot mappings
+│       ├── play/             # Trigger playback
+│       ├── stop/             # Stop playback
+│       └── tts/              # Text-to-speech
+├── components/
+│   ├── dots/                 # Kid-facing UI components
+│   └── admin/                # Admin panel components
+├── hooks/
+│   └── useNfcScanner.ts      # Web NFC API hook
+├── services/
+│   ├── dotMappingService.ts  # NFC tag → playlist storage
+│   ├── homeAssistantService.ts
+│   └── nanoGptService.ts
+└── types/
+    └── dot.ts                # TypeScript definitions
+```
 
-## 💖 Built with Love
+## Troubleshooting
 
-Created specifically for young music lovers who deserve a safe, simple, and beautiful way to enjoy their favorite songs.
+### "This tablet can't read Dots"
+- Ensure you're using Chrome on Android
+- Check that NFC is enabled in device settings
+- The device must have NFC hardware
 
----
+### "Can't reach the speaker"
+- Verify `HA_URL` is accessible from the container
+- Check `HA_TOKEN` is valid and not expired
+- Confirm `HA_SPEAKER_ENTITY` exists in Home Assistant
 
-**Made with ❤️ for little music lovers everywhere**
+### "Permission denied" errors
+- Ensure the `/data` volume is writable
+- For Kubernetes, add `fsGroup: 1001` to the pod security context
+
+### NFC not scanning
+- Web NFC requires HTTPS in production
+- User must tap "Tap to Start" button first (browser permission requirement)
+- Hold the tag steady for 1-2 seconds
+
+## Tech Stack
+
+- **Next.js 14** - React framework with App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling with custom kid-friendly theme
+- **Web NFC API** - NFC tag reading (Chrome on Android)
+- **Home Assistant REST API** - Smart speaker control
+- **NanoGPT** - Text-to-speech for voice feedback
+
+## License
+
+MIT
+
+## Acknowledgments
+
+Built with love for little music lovers who deserve a simple, magical way to play their favorite songs.

@@ -24,7 +24,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env*.local
+.env.production
 
 # vercel
 .vercel
@@ -35,3 +37,13 @@ next-env.d.ts
 
 # local data files
 /data/*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# logs
+logs/
+*.log
