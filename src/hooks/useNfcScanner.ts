@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface NfcScanResult {
   tagId: string;
@@ -23,11 +23,22 @@ export function useNfcScanner(): UseNfcScannerReturn {
   const [isScanning, setIsScanning] = useState(false);
   const [lastScan, setLastScan] = useState<NfcScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+  // Use refs to avoid stale closures and manage cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const ndefReaderRef = useRef<unknown>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     // Check if Web NFC is supported
     setIsSupported('NDEFReader' in window);
+
+    // Mark as mounted
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const startScanning = useCallback(async () => {
@@ -36,30 +47,56 @@ export function useNfcScanner(): UseNfcScannerReturn {
       return;
     }
 
+    // Prevent concurrent scans
+    if (isScanning) {
+      return;
+    }
+
     try {
       setError(null);
       const controller = new AbortController();
-      setAbortController(controller);
+      abortControllerRef.current = controller;
 
       // @ts-expect-error - NDEFReader is not in TypeScript types yet
       const ndef = new NDEFReader();
+      ndefReaderRef.current = ndef;
+
+      // Define event handlers as named functions for cleanup
+      const handleReading = ({ serialNumber }: { serialNumber: string }) => {
+        if (isMountedRef.current) {
+          const tagId = serialNumber || 'unknown';
+          setLastScan({
+            tagId,
+            timestamp: Date.now(),
+          });
+        }
+      };
+
+      const handleReadingError = () => {
+        if (isMountedRef.current) {
+          setError('Error reading NFC tag. Try again.');
+        }
+      };
+
+      const handleAbort = () => {
+        if (isMountedRef.current) {
+          setIsScanning(false);
+        }
+      };
 
       await ndef.scan({ signal: controller.signal });
-      setIsScanning(true);
 
-      ndef.addEventListener('reading', ({ serialNumber }: { serialNumber: string }) => {
-        // Convert serial number to a readable format
-        const tagId = serialNumber || 'unknown';
-        setLastScan({
-          tagId,
-          timestamp: Date.now(),
-        });
-      });
+      if (isMountedRef.current) {
+        setIsScanning(true);
+      }
 
-      ndef.addEventListener('readingerror', () => {
-        setError('Error reading NFC tag. Try again.');
-      });
+      ndef.addEventListener('reading', handleReading);
+      ndef.addEventListener('readingerror', handleReadingError);
+      controller.signal.addEventListener('abort', handleAbort);
+
     } catch (err) {
+      if (!isMountedRef.current) return;
+
       const message = err instanceof Error ? err.message : 'Failed to start NFC scanning';
 
       if (message.includes('permission')) {
@@ -69,24 +106,25 @@ export function useNfcScanner(): UseNfcScannerReturn {
       }
       setIsScanning(false);
     }
-  }, [isSupported]);
+  }, [isSupported, isScanning]);
 
   const stopScanning = useCallback(() => {
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
+    ndefReaderRef.current = null;
     setIsScanning(false);
-  }, [abortController]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (abortController) {
-        abortController.abort();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
-  }, [abortController]);
+  }, []);
 
   return {
     isSupported,
