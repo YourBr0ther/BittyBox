@@ -44,6 +44,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       color,
     });
 
+    if (!mapping) {
+      return NextResponse.json(
+        { error: 'Dot not found' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ mapping });
   } catch (error) {
     console.error('Error updating dot:', error);
@@ -56,7 +63,15 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { tagId } = await context.params;
     const decodedTagId = decodeURIComponent(tagId);
-    await DotMappingService.delete(decodedTagId);
+    const deleted = await DotMappingService.delete(decodedTagId);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'Dot not found' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting dot:', error);
