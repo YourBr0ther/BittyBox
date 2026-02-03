@@ -95,6 +95,10 @@ const EmojiBurst = ({
   );
 };
 
+// Static constants moved outside component to avoid useEffect dependency issues
+const CONFETTI_COLORS = ['#FF6B9D', '#FFB5D4', '#9D4EDD', '#C77DFF', '#FFD93D', '#FFB4A2', '#fff'];
+const BURST_EMOJIS = ['⭐', '✨', '💖', '🎵', '🌟', '💫', '🎶', '🎀'];
+
 export default function SuccessAnimation({ playlistName }: SuccessAnimationProps) {
   const [confetti, setConfetti] = useState<Array<{
     id: number;
@@ -104,14 +108,11 @@ export default function SuccessAnimation({ playlistName }: SuccessAnimationProps
     rotation: number;
   }>>([]);
 
-  const confettiColors = ['#FF6B9D', '#FFB5D4', '#9D4EDD', '#C77DFF', '#FFD93D', '#FFB4A2', '#fff'];
-  const burstEmojis = ['⭐', '✨', '💖', '🎵', '🌟', '💫', '🎶', '🎀'];
-
   useEffect(() => {
     // Generate confetti
     const newConfetti = Array.from({ length: 50 }, (_, i) => ({
       id: i,
-      color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
       delay: Math.random() * 0.5,
       left: Math.random() * 100,
       rotation: Math.random() * 360,
@@ -123,11 +124,11 @@ export default function SuccessAnimation({ playlistName }: SuccessAnimationProps
     angle: i * 30,
     distance: 100 + Math.random() * 50,
     size: 20 + Math.random() * 20,
-    color: confettiColors[i % confettiColors.length],
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
     delay: i * 0.05,
   }));
 
-  const emojiBursts = burstEmojis.map((emoji, i) => ({
+  const emojiBursts = BURST_EMOJIS.map((emoji, i) => ({
     emoji,
     angle: i * 45,
     distance: 150 + Math.random() * 50,
