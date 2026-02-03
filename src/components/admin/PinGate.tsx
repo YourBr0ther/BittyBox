@@ -1,6 +1,13 @@
+/**
+ * PinGate - Soft child-proofing for admin settings
+ *
+ * NOTE: This is NOT a security measure. The PIN is client-side only
+ * and provides a simple barrier to prevent accidental access by children.
+ * For actual security, implement server-side authentication.
+ */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface PinGateProps {
   children: React.ReactNode;
@@ -11,8 +18,18 @@ export default function PinGate({ children }: PinGateProps) {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const correctPin = process.env.NEXT_PUBLIC_ADMIN_PIN || '1234';
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleDigit = useCallback((digit: string) => {
     if (pin.length >= 4) return;
@@ -28,7 +45,7 @@ export default function PinGate({ children }: PinGateProps) {
       } else {
         setError('Oops! Try again');
         setIsShaking(true);
-        setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
           setPin('');
           setIsShaking(false);
         }, 500);

@@ -3,25 +3,7 @@
 import { useState, useEffect } from 'react';
 import { DotMapping, DOT_ICONS, DOT_COLORS, DotIcon, DotColor } from '@/types/dot';
 import { useNfcScanner } from '@/hooks/useNfcScanner';
-
-// Icon mapping to emojis
-const iconToEmoji: Record<string, string> = {
-  star: '⭐',
-  heart: '💖',
-  music: '🎵',
-  sparkles: '✨',
-  rainbow: '🌈',
-  unicorn: '🦄',
-  castle: '🏰',
-  butterfly: '🦋',
-  flower: '🌸',
-  sun: '☀️',
-  moon: '🌙',
-  cloud: '☁️',
-  cat: '🐱',
-  dog: '🐶',
-  bunny: '🐰',
-};
+import { iconToEmoji } from '@/utils/icons';
 
 interface DotFormProps {
   dot?: DotMapping;
@@ -70,6 +52,12 @@ export default function DotForm({ dot, onSave, onCancel }: DotFormProps) {
 
     if (!playlistUrl.trim()) {
       newErrors.playlistUrl = 'Playlist URL is required';
+    } else {
+      try {
+        new URL(playlistUrl);
+      } catch {
+        newErrors.playlistUrl = 'Please enter a valid URL';
+      }
     }
 
     setErrors(newErrors);

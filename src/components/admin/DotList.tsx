@@ -2,25 +2,7 @@
 
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { DotMapping } from '@/types/dot';
-
-// Icon mapping to emojis
-const iconToEmoji: Record<string, string> = {
-  star: '⭐',
-  heart: '💖',
-  music: '🎵',
-  sparkles: '✨',
-  rainbow: '🌈',
-  unicorn: '🦄',
-  castle: '🏰',
-  butterfly: '🦋',
-  flower: '🌸',
-  sun: '☀️',
-  moon: '🌙',
-  cloud: '☁️',
-  cat: '🐱',
-  dog: '🐶',
-  bunny: '🐰',
-};
+import { iconToEmoji } from '@/utils/icons';
 
 interface DotListProps {
   onEdit: (dot: DotMapping) => void;
