@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNfcScanner } from '@/hooks/useNfcScanner';
 import { WaitingScreen, NowPlayingScreen, SuccessAnimation, ErrorScreen } from '@/components/dots';
 
-type AppState = 'waiting' | 'scanning' | 'success' | 'playing' | 'error';
+type AppState = 'ready' | 'waiting' | 'scanning' | 'success' | 'playing' | 'error';
 
 interface PlayingInfo {
   playlistName: string;
@@ -20,7 +20,7 @@ interface ErrorInfo {
 }
 
 export default function Home() {
-  const [appState, setAppState] = useState<AppState>('waiting');
+  const [appState, setAppState] = useState<AppState>('ready');
   const [playingInfo, setPlayingInfo] = useState<PlayingInfo | null>(null);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -41,10 +41,11 @@ export default function Home() {
     };
   }, []);
 
-  // Start scanning on mount
-  useEffect(() => {
+  // Handle user tap to start scanning (required for Web NFC permission)
+  const handleStartScanning = useCallback(async () => {
     if (isSupported && !isScanning) {
-      startScanning();
+      await startScanning();
+      setAppState('waiting');
     }
   }, [isSupported, isScanning, startScanning]);
 
@@ -221,6 +222,29 @@ export default function Home() {
 
   // Render based on state
   switch (appState) {
+    case 'ready':
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-pink-100 via-purple-50 to-pink-100 flex flex-col items-center justify-center p-8">
+          <div className="text-center space-y-8">
+            <h1 className="text-4xl font-bold text-pink-primary font-display">
+              BittyBox
+            </h1>
+            <p className="text-xl text-gray-600">
+              Ready to play some music?
+            </p>
+            <button
+              onClick={handleStartScanning}
+              className="px-12 py-6 bg-gradient-to-r from-pink-primary to-magic-purple text-white text-2xl font-bold rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 animate-pulse"
+            >
+              ✨ Tap to Start ✨
+            </button>
+            <p className="text-sm text-gray-500">
+              Tap the button, then hold your Dot near the tablet
+            </p>
+          </div>
+        </div>
+      );
+
     case 'playing':
       return playingInfo ? (
         <NowPlayingScreen
