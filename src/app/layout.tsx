@@ -1,6 +1,6 @@
 import '@/styles/globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Nunito } from 'next/font/google';
+import { Nunito, Fredoka } from 'next/font/google';
 import Providers from './providers';
 import PWARegister from './pwa';
 
@@ -8,6 +8,12 @@ const nunito = Nunito({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-nunito',
+});
+
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-fredoka',
 });
 
 export const viewport: Viewport = {
@@ -45,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={nunito.variable}>
+    <html lang="en" className={`${nunito.variable} ${fredoka.variable}`}>
       <head>
         <meta name="application-name" content="BittyBox" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
