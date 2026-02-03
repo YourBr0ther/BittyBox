@@ -48,7 +48,7 @@ export function useNfcScanner(): UseNfcScannerReturn {
 
   // Cleanup function to remove all event listeners
   const cleanupListeners = useCallback(() => {
-    if (ndefReaderRef.current && handleReadingRef.current) {
+    if (ndefReaderRef.current) {
       const ndef = ndefReaderRef.current as {
         removeEventListener: (type: string, handler: unknown) => void
       };
