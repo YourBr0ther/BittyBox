@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNfcScanner } from '@/hooks/useNfcScanner';
 import { WaitingScreen, NowPlayingScreen, SuccessAnimation, ErrorScreen } from '@/components/dots';
 
@@ -25,7 +25,21 @@ export default function Home() {
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const { isSupported, isScanning, lastScan, error: nfcError, startScanning } = useNfcScanner();
+  // Refs for cleanup and debouncing
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastProcessedScanRef = useRef<string | null>(null);
+  const isProcessingRef = useRef(false);
+
+  const { isSupported, isScanning, lastScan, startScanning } = useNfcScanner();
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Start scanning on mount
   useEffect(() => {
@@ -55,9 +69,14 @@ export default function Home() {
       });
 
       if (response.ok) {
-        const { audioUrl } = await response.json();
-        const audio = new Audio(audioUrl);
-        audio.play().catch(console.error);
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          if (data.audioUrl) {
+            const audio = new Audio(data.audioUrl);
+            audio.play().catch(console.error);
+          }
+        }
       }
     } catch (error) {
       console.error('TTS error:', error);
@@ -68,6 +87,23 @@ export default function Home() {
   useEffect(() => {
     if (!lastScan) return;
 
+    // Create unique scan key from tagId and timestamp
+    const scanKey = `${lastScan.tagId}-${lastScan.timestamp}`;
+
+    // Debounce: Skip if we already processed this scan
+    if (lastProcessedScanRef.current === scanKey) {
+      return;
+    }
+
+    // Skip if we're currently processing a scan or showing success animation
+    if (isProcessingRef.current || showSuccess) {
+      return;
+    }
+
+    // Mark this scan as processed
+    lastProcessedScanRef.current = scanKey;
+    isProcessingRef.current = true;
+
     const handleScan = async () => {
       try {
         // Call play API
@@ -77,7 +113,18 @@ export default function Home() {
           body: JSON.stringify({ tagId: lastScan.tagId }),
         });
 
-        const data = await response.json();
+        // Safe JSON parsing
+        let data;
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+          } else {
+            throw new Error('Invalid response format');
+          }
+        } catch {
+          throw new Error('Failed to parse response');
+        }
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -91,10 +138,11 @@ export default function Home() {
             setAppState('error');
             setErrorInfo({
               type: 'speaker_offline',
-              message: "Can't reach the speaker right now.",
+              message: data?.error || "Can't reach the speaker right now.",
             });
             playTTS('error');
           }
+          isProcessingRef.current = false;
           return;
         }
 
@@ -109,10 +157,16 @@ export default function Home() {
         // Play TTS
         playTTS('nowPlaying', data.mapping.playlistName);
 
+        // Clear any existing timeout
+        if (successTimeoutRef.current) {
+          clearTimeout(successTimeoutRef.current);
+        }
+
         // After animation, show now playing
-        setTimeout(() => {
+        successTimeoutRef.current = setTimeout(() => {
           setShowSuccess(false);
           setAppState('playing');
+          isProcessingRef.current = false;
         }, 2000);
       } catch (error) {
         console.error('Scan handling error:', error);
@@ -122,27 +176,41 @@ export default function Home() {
           message: 'Oops! Something went wrong.',
         });
         playTTS('error');
+        isProcessingRef.current = false;
       }
     };
 
     handleScan();
-  }, [lastScan, playTTS]);
+  }, [lastScan, playTTS, showSuccess]);
 
   // Handle stop
   const handleStop = useCallback(async () => {
+    // Clear any pending timeout
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+
     try {
       await fetch('/api/stop', { method: 'POST' });
     } catch (error) {
       console.error('Stop error:', error);
     }
+
+    // Reset state
     setPlayingInfo(null);
+    setShowSuccess(false);
     setAppState('waiting');
+    isProcessingRef.current = false;
+    lastProcessedScanRef.current = null;
   }, []);
 
   // Handle dismiss error
   const handleDismissError = useCallback(() => {
     setErrorInfo(null);
     setAppState('waiting');
+    isProcessingRef.current = false;
+    lastProcessedScanRef.current = null;
   }, []);
 
   // Render success animation overlay
