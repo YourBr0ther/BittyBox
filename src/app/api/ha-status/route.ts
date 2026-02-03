@@ -5,9 +5,9 @@ import { HomeAssistantService } from '@/services/homeAssistantService';
 
 export async function GET() {
   try {
-    const haUrl = process.env.HOME_ASSISTANT_URL;
-    const haToken = process.env.HOME_ASSISTANT_TOKEN;
-    const speaker = process.env.HOME_ASSISTANT_SPEAKER || 'media_player.kid_room_speaker';
+    const haUrl = process.env.HA_URL;
+    const haToken = process.env.HA_TOKEN;
+    const speaker = process.env.HA_SPEAKER_ENTITY || 'media_player.kid_room_speaker';
 
     if (!haUrl || !haToken) {
       return NextResponse.json({
