@@ -29,6 +29,11 @@ export function useNfcScanner(): UseNfcScannerReturn {
   const ndefReaderRef = useRef<unknown>(null);
   const isMountedRef = useRef(true);
 
+  // Store event handler refs for proper cleanup
+  const handleReadingRef = useRef<((event: { serialNumber: string }) => void) | null>(null);
+  const handleReadingErrorRef = useRef<(() => void) | null>(null);
+  const handleAbortRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     // Check if Web NFC is supported
     setIsSupported('NDEFReader' in window);
@@ -39,6 +44,29 @@ export function useNfcScanner(): UseNfcScannerReturn {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  // Cleanup function to remove all event listeners
+  const cleanupListeners = useCallback(() => {
+    if (ndefReaderRef.current && handleReadingRef.current) {
+      const ndef = ndefReaderRef.current as {
+        removeEventListener: (type: string, handler: unknown) => void
+      };
+      if (handleReadingRef.current) {
+        ndef.removeEventListener('reading', handleReadingRef.current);
+      }
+      if (handleReadingErrorRef.current) {
+        ndef.removeEventListener('readingerror', handleReadingErrorRef.current);
+      }
+    }
+    if (abortControllerRef.current && handleAbortRef.current) {
+      abortControllerRef.current.signal.removeEventListener('abort', handleAbortRef.current);
+    }
+
+    // Clear refs
+    handleReadingRef.current = null;
+    handleReadingErrorRef.current = null;
+    handleAbortRef.current = null;
   }, []);
 
   const startScanning = useCallback(async () => {
@@ -54,6 +82,10 @@ export function useNfcScanner(): UseNfcScannerReturn {
 
     try {
       setError(null);
+
+      // Clean up any existing listeners first
+      cleanupListeners();
+
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
@@ -61,8 +93,8 @@ export function useNfcScanner(): UseNfcScannerReturn {
       const ndef = new NDEFReader();
       ndefReaderRef.current = ndef;
 
-      // Define event handlers as named functions for cleanup
-      const handleReading = ({ serialNumber }: { serialNumber: string }) => {
+      // Create event handlers and store in refs
+      handleReadingRef.current = ({ serialNumber }: { serialNumber: string }) => {
         if (isMountedRef.current) {
           const tagId = serialNumber || 'unknown';
           setLastScan({
@@ -72,13 +104,13 @@ export function useNfcScanner(): UseNfcScannerReturn {
         }
       };
 
-      const handleReadingError = () => {
+      handleReadingErrorRef.current = () => {
         if (isMountedRef.current) {
           setError('Error reading NFC tag. Try again.');
         }
       };
 
-      const handleAbort = () => {
+      handleAbortRef.current = () => {
         if (isMountedRef.current) {
           setIsScanning(false);
         }
@@ -90,9 +122,10 @@ export function useNfcScanner(): UseNfcScannerReturn {
         setIsScanning(true);
       }
 
-      ndef.addEventListener('reading', handleReading);
-      ndef.addEventListener('readingerror', handleReadingError);
-      controller.signal.addEventListener('abort', handleAbort);
+      // Attach event listeners
+      ndef.addEventListener('reading', handleReadingRef.current);
+      ndef.addEventListener('readingerror', handleReadingErrorRef.current);
+      controller.signal.addEventListener('abort', handleAbortRef.current);
 
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -106,25 +139,30 @@ export function useNfcScanner(): UseNfcScannerReturn {
       }
       setIsScanning(false);
     }
-  }, [isSupported, isScanning]);
+  }, [isSupported, isScanning, cleanupListeners]);
 
   const stopScanning = useCallback(() => {
+    // Remove event listeners first
+    cleanupListeners();
+
+    // Then abort and clear refs
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     ndefReaderRef.current = null;
     setIsScanning(false);
-  }, []);
+  }, [cleanupListeners]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      cleanupListeners();
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [cleanupListeners]);
 
   return {
     isSupported,
