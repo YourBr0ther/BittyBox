@@ -2,8 +2,7 @@
 
 interface HAServiceCallPayload {
   entity_id: string;
-  media_content_id: string;
-  media_content_type: string;
+  [key: string]: unknown;
 }
 
 interface HAState {
@@ -18,6 +17,35 @@ interface HAState {
   };
 }
 
+const TIMEOUT_MS = 10000; // 10 second timeout
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Home Assistant request timed out');
+    }
+    if (error instanceof TypeError) {
+      throw new Error('Cannot connect to Home Assistant. Check network and URL.');
+    }
+    throw error;
+  }
+}
+
 export const HomeAssistantService = {
   async callService(
     domain: string,
@@ -26,14 +54,17 @@ export const HomeAssistantService = {
     haUrl: string,
     haToken: string
   ): Promise<void> {
-    const response = await fetch(`${haUrl}/api/services/${domain}/${service}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${haToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchWithTimeout(
+      `${haUrl}/api/services/${domain}/${service}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${haToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.text();
@@ -65,19 +96,15 @@ export const HomeAssistantService = {
     haUrl: string,
     haToken: string
   ): Promise<void> {
-    const response = await fetch(`${haUrl}/api/services/media_player/media_stop`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${haToken}`,
-        'Content-Type': 'application/json',
+    await this.callService(
+      'media_player',
+      'media_stop',
+      {
+        entity_id: speakerEntityId,
       },
-      body: JSON.stringify({ entity_id: speakerEntityId }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Home Assistant error: ${error}`);
-    }
+      haUrl,
+      haToken
+    );
   },
 
   async getState(
@@ -85,12 +112,15 @@ export const HomeAssistantService = {
     haUrl: string,
     haToken: string
   ): Promise<HAState> {
-    const response = await fetch(`${haUrl}/api/states/${entityId}`, {
-      headers: {
-        'Authorization': `Bearer ${haToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await fetchWithTimeout(
+      `${haUrl}/api/states/${entityId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${haToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
       const error = await response.text();
@@ -102,11 +132,15 @@ export const HomeAssistantService = {
 
   async checkConnection(haUrl: string, haToken: string): Promise<boolean> {
     try {
-      const response = await fetch(`${haUrl}/api/`, {
-        headers: {
-          'Authorization': `Bearer ${haToken}`,
+      const response = await fetchWithTimeout(
+        `${haUrl}/api/`,
+        {
+          headers: {
+            'Authorization': `Bearer ${haToken}`,
+          },
         },
-      });
+        5000 // Shorter timeout for connection check
+      );
       return response.ok;
     } catch {
       return false;
