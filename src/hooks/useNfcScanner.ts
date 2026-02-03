@@ -100,8 +100,10 @@ export function useNfcScanner(): UseNfcScannerReturn {
 
       // Create event handlers and store in refs
       handleReadingRef.current = ({ serialNumber }: { serialNumber: string }) => {
+        console.log('NFC Reading event:', { serialNumber });
         if (isMountedRef.current) {
-          const tagId = serialNumber || 'unknown';
+          const tagId = serialNumber || `tag-${Date.now()}`;
+          console.log('Setting lastScan with tagId:', tagId);
           setLastScan({
             tagId,
             timestamp: Date.now(),
@@ -121,7 +123,9 @@ export function useNfcScanner(): UseNfcScannerReturn {
         }
       };
 
+      console.log('Starting NFC scan...');
       await ndef.scan({ signal: controller.signal });
+      console.log('NFC scan started successfully');
 
       if (isMountedRef.current) {
         setIsScanning(true);
