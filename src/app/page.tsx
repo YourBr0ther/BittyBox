@@ -48,9 +48,10 @@ export default function Home() {
     }
   }, [isSupported, isScanning, startScanning]);
 
-  // Handle NFC not supported
+  // Handle NFC not supported (only after check completes)
   useEffect(() => {
-    if (!isSupported && typeof window !== 'undefined') {
+    // Wait for support check to complete (isSupported will be null initially)
+    if (isSupported === false) {
       setAppState('error');
       setErrorInfo({
         type: 'nfc_unsupported',

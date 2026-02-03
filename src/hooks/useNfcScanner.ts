@@ -10,7 +10,7 @@ interface NfcScanResult {
 }
 
 interface UseNfcScannerReturn {
-  isSupported: boolean;
+  isSupported: boolean | null; // null = not yet checked
   isScanning: boolean;
   lastScan: NfcScanResult | null;
   error: string | null;
@@ -19,7 +19,8 @@ interface UseNfcScannerReturn {
 }
 
 export function useNfcScanner(): UseNfcScannerReturn {
-  const [isSupported, setIsSupported] = useState(false);
+  // Start as null to indicate "not yet checked"
+  const [isSupported, setIsSupported] = useState<boolean | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastScan, setLastScan] = useState<NfcScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,10 @@ export function useNfcScanner(): UseNfcScannerReturn {
   }, []);
 
   const startScanning = useCallback(async () => {
+    if (isSupported === null) {
+      // Still checking support
+      return;
+    }
     if (!isSupported) {
       setError('NFC is not supported on this device');
       return;
