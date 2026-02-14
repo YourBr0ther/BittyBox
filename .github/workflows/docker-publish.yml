@@ -56,12 +56,13 @@ jobs:
           /** @type {import('next').NextConfig} */
           const nextConfig = {
             output: 'standalone',
-            experimental: {
-              outputFileTracingRoot: undefined,
-            },
             images: {
+              domains: ['i.ytimg.com', 'img.youtube.com'],
               unoptimized: true,
             },
+            trailingSlash: false,
+            productionBrowserSourceMaps: false,
+            crossOrigin: 'anonymous',
           }
           
           module.exports = nextConfig
